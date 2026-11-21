@@ -250,7 +250,7 @@ class MainActivity : ComponentActivity() {
         }
         Text("Віджет: утримуйте робочий стіл → Віджети → SM Світло. Кожен віджет - свої групи і стиль (кольоровий / ч/б).",
             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp, start = 6.dp))
-        Text("SM Світло 1.2 · @savchenko_mykhailo", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Text("SM Світло 1.2.1 · @savchenko_mykhailo", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp, start = 6.dp))
     }
 

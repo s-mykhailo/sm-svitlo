@@ -36,7 +36,7 @@ Android-застосунок з графіками відключень ДТЕК
 
 - Kotlin, Jetpack Compose, Material 3
 - WorkManager для фонового оновлення, AlarmManager для точних нагадувань, foreground service для режиму реального часу
-- minSdk 26, targetSdk 35, версія 1.2
+- minSdk 26, targetSdk 35, версія 1.2.1
 - Юніт-тести логіки графіка і скріншот-тести на Paparazzi (`app/src/test`)
 
 ## Збірка

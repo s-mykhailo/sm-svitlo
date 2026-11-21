@@ -50,7 +50,7 @@ class WidgetShot {
             androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF55657F))) {
                 for (style in 0..2) {
                     val b = com.savchenko.smsvitlo.widget.WidgetRenderer.render(c, s,
-                        Settings.WidgetCfg(listOf("GPV6.2", "GPV1.1"), style, 85, false), 340, 150)
+                        Settings.WidgetCfg(if (style == 1) listOf("GPV1.1") else listOf("GPV6.2", "GPV1.1"), style, 85, false), if (style == 1) 165 else 340, if (style == 1) 70 else 150)
                     androidx.compose.foundation.Image(b.asImageBitmap(), null, Modifier.fillMaxWidth().padding(10.dp))
                 }
             }

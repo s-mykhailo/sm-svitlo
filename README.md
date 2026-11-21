@@ -36,7 +36,7 @@ Schedules come from the open [outage-data-ua](https://github.com/Baskerville42/o
 
 - Kotlin, Jetpack Compose, Material 3
 - WorkManager for background sync, AlarmManager for exact reminders, a foreground service for real-time mode
-- minSdk 26, targetSdk 35, version 1.2
+- minSdk 26, targetSdk 35, version 1.2.1
 - Unit tests for the schedule logic and screenshot tests with Paparazzi (`app/src/test`)
 
 ## Build

@@ -14,7 +14,9 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Bundle
+import android.util.SizeF
 import android.widget.RemoteViews
 import com.savchenko.smsvitlo.R
 import com.savchenko.smsvitlo.data.Half
@@ -54,24 +56,37 @@ class ScheduleWidget : AppWidgetProvider() {
 
         fun update(c: Context, m: AppWidgetManager, id: Int) {
             val o = m.getAppWidgetOptions(id)
-            val portrait = c.resources.configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            var wDp = if (portrait) o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) else o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH)
-            var hDp = if (portrait) o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT) else o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
-            if (wDp <= 0) wDp = 300
-            if (hDp <= 0) hDp = 110
             val cfg = Settings(c).widget(id)
-            val bmp = try {
-                WidgetRenderer.render(c, Repository.current(c), cfg, wDp, hDp)
-            } catch (e: Exception) { null }
-            val rv = RemoteViews(c.packageName, R.layout.widget)
-            if (bmp != null) rv.setImageViewBitmap(R.id.img, bmp)
+            val snap = Repository.current(c)
             val pi = PendingIntent.getActivity(
                 c, id, Intent(c, MainActivity::class.java).putExtra("refresh", true)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
-            rv.setOnClickPendingIntent(R.id.img, pi)
-            m.updateAppWidget(id, rv)
+            fun views(wDp: Int, hDp: Int, maxPx: Float): RemoteViews {
+                val rv = RemoteViews(c.packageName, R.layout.widget)
+                try { rv.setImageViewBitmap(R.id.img, WidgetRenderer.render(c, snap, cfg, wDp, hDp, maxPx)) } catch (_: Exception) {}
+                rv.setOnClickPendingIntent(R.id.img, pi)
+                return rv
+            }
+            // Android 12+: лаунчер дає точні розміри - малюємо під кожен, без розтягування
+            if (Build.VERSION.SDK_INT >= 31) {
+                val sizes: List<SizeF>? = if (Build.VERSION.SDK_INT >= 33)
+                    o.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, SizeF::class.java)
+                else @Suppress("DEPRECATION") o.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+                val list = sizes?.filter { it.width > 0 && it.height > 0 }?.distinctBy { it.width.toInt() to it.height.toInt() }?.take(3)
+                if (!list.isNullOrEmpty()) {
+                    val maxPx = 1_800_000f / list.size
+                    m.updateAppWidget(id, RemoteViews(list.associateWith { views(it.width.toInt(), it.height.toInt(), maxPx) }))
+                    return
+                }
+            }
+            val portrait = c.resources.configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            var wDp = if (portrait) o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) else o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH)
+            var hDp = if (portrait) o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT) else o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+            if (wDp <= 0) wDp = 300
+            if (hDp <= 0) hDp = 110
+            m.updateAppWidget(id, views(wDp, hDp, 1_400_000f))
         }
     }
 }
@@ -108,11 +123,10 @@ object WidgetRenderer {
         Half.ON -> p.on; Half.OFF -> p.off; Half.MAYBE -> p.maybe; Half.UNKNOWN -> p.unknown
     }
 
-    fun render(c: Context, s: Snapshot, cfg: Settings.WidgetCfg, wDp: Int, hDp: Int): Bitmap {
+    fun render(c: Context, s: Snapshot, cfg: Settings.WidgetCfg, wDp: Int, hDp: Int, maxPx: Float = 1_400_000f): Bitmap {
         val dm = c.resources.displayMetrics
         var d = dm.density
         // обмеження пам'яті RemoteViews
-        val maxPx = 1_400_000f
         if (wDp * hDp * d * d > maxPx) d = kotlin.math.sqrt(maxPx / (wDp * hDp))
         val W = (wDp * d).toInt().coerceAtLeast(50)
         val H = (hDp * d).toInt().coerceAtLeast(30)
@@ -222,7 +236,8 @@ object WidgetRenderer {
         if (!compact) {
             val lp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = p.sub; textSize = 8.5f * d; textAlign = Paint.Align.CENTER }
             val ly = barTop + nBars * barH + (nBars - 1) * gap + 9.5f * d
-            for (hh in 0..24 step 3) {
+            val step = if (x1 - x0 < 230 * d) 6 else 3
+            for (hh in 0..24 step step) {
                 val xx = x0 + (x1 - x0) * hh / 24f
                 lp.textAlign = when (hh) { 0 -> Paint.Align.LEFT; 24 -> Paint.Align.RIGHT; else -> Paint.Align.CENTER }
                 cv.drawText(hh.toString(), xx, ly, lp)
