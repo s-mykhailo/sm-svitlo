@@ -119,6 +119,19 @@ object Notifier {
         ed.putBoolean("init", true).apply()
     }
 
+    /** Зміна стану відключення за адресою (почалось / закінчилось / змінився час відновлення). */
+    fun houseChanged(c: Context, e: Settings.Entry, old: com.savchenko.smsvitlo.data.House, new: com.savchenko.smsvitlo.data.House) {
+        if (!Settings(c).notifyAttention) return
+        val name = e.label.ifBlank { e.address }
+        val (title, text) = when {
+            !old.active && new.active -> "${new.shortType}: $name" to listOfNotNull(new.untilText?.let { "Відновлення $it" }, new.subType).joinToString("\n")
+            old.active && !new.active -> "Відключення за адресою скасовано: $name" to "За даними ДТЕК відключення закінчилось"
+            new.active && old.end != new.end -> "Змінено час відновлення: $name" to (new.untilText?.let { "Відновлення $it" } ?: "")
+            else -> return
+        }
+        post(c, CH_ATTENTION, ("house" + e.key).hashCode(), title, text)
+    }
+
     /** Коли змінюється список груп - запам'ятати поточний стан без пушів. */
     fun primeGroups(c: Context, s: Snapshot) {
         val pr = c.getSharedPreferences("sigs", Context.MODE_PRIVATE)

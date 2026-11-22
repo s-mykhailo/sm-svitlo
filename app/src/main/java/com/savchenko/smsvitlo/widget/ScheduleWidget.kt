@@ -174,7 +174,8 @@ object WidgetRenderer {
         val compact = rowH < (if (bars == 2) 62 else 44) * d
         for ((i, g) in groups.withIndex()) {
             val y0 = top + i * rowH
-            drawRow(cv, s, g, today, now, p, d, pad, y0, W - pad, rowH, compact, cfg.tomorrow)
+            drawRow(cv, s, g, today, now, p, d, pad, y0, W - pad, rowH, compact, cfg.tomorrow,
+                com.savchenko.smsvitlo.data.Address.activeForGroup(c, g))
         }
         return bmp
     }
@@ -182,6 +183,7 @@ object WidgetRenderer {
     private fun drawRow(
         cv: Canvas, s: Snapshot, g: String, today: java.time.LocalDate, now: java.time.ZonedDateTime,
         p: Palette, d: Float, x0: Float, y0: Float, x1: Float, rowH: Float, compact: Boolean, tomorrow: Boolean,
+        house: com.savchenko.smsvitlo.data.House? = null,
     ) {
         val st = Timeline.status(s, g, now)
         val big = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = p.text; typeface = Typeface.DEFAULT_BOLD }
@@ -195,7 +197,7 @@ object WidgetRenderer {
 
         // кружечок стану
         val r = titleSize * 0.32f
-        dot.color = st?.let { colorOf(p, it.current) } ?: p.unknown
+        dot.color = if (house != null) p.off else st?.let { colorOf(p, it.current) } ?: p.unknown
         cv.drawCircle(x0 + r, baseY - titleSize * 0.35f, r, dot)
         if (p.hatch) {
             dot.style = Paint.Style.STROKE; dot.strokeWidth = 1.2f * d; dot.color = p.text
@@ -206,10 +208,10 @@ object WidgetRenderer {
         cv.drawText(label, x, baseY, big)
         x += big.measureText(label) + 8 * d
 
-        val stateTxt = st?.let { Timeline.stateText(it.current) } ?: "Немає даних"
-        val change = st?.let { Timeline.changeText(it) }
+        val stateTxt = house?.shortType ?: st?.let { Timeline.stateText(it.current) } ?: "Немає даних"
+        val change = if (house != null) house.untilText else st?.let { Timeline.changeText(it) }
         val left = Duration.between(now, st?.changeAt ?: now)
-        val right = st?.changeAt?.let { Timeline.inShort(left) } ?: ""
+        val right = if (house != null) "" else st?.changeAt?.let { Timeline.inShort(left) } ?: ""
 
         big.textAlign = Paint.Align.RIGHT
         val rightSize = titleSize * 0.95f

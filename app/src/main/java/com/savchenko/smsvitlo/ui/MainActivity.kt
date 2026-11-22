@@ -178,12 +178,14 @@ class MainActivity : ComponentActivity() {
             if (look.snow) Snow(look.snowAmount, LocalDark.current)
         }
 
-        if (sheetOpen) EntrySheet(s, sheetFor, onDismiss = { sheetOpen = false }) { id, label ->
+        if (sheetOpen) EntrySheet(s, sheetFor, onDismiss = { sheetOpen = false }) { r ->
             val e = sheetFor
-            saveEntries(
-                if (e == null) list + Settings.Entry(id + "#" + System.nanoTime(), id, label, true)
-                else list.map { if (it.key == e.key) it.copy(id = id, label = label) else it }
-            )
+            val l = r.lookup
+            val label = r.label.ifBlank { if (l?.approx == true) "Моя локація" else "" }
+            val base = e ?: Settings.Entry(r.id + "#" + System.nanoTime(), r.id, label, true)
+            val upd = base.copy(id = r.id, label = label, city = l?.city, street = l?.street, house = l?.house, approx = l?.approx ?: false)
+            l?.status?.let { com.savchenko.smsvitlo.data.Address.saveStatus(this@MainActivity, upd.key, it) }
+            saveEntries(if (e == null) list + upd else list.map { if (it.key == e.key) upd else it })
             sheetOpen = false
         }
         toDelete?.let { e ->
@@ -250,7 +252,7 @@ class MainActivity : ComponentActivity() {
         }
         Text("Віджет: утримуйте робочий стіл → Віджети → SM Світло. Кожен віджет - свої групи і стиль (кольоровий / ч/б).",
             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp, start = 6.dp))
-        Text("SM Світло 1.2.1 · @savchenko_mykhailo", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Text("SM Світло 1.3.0 · @savchenko_mykhailo", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp, start = 6.dp))
     }
 

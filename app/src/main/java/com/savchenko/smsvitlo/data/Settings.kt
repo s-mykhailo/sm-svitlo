@@ -7,7 +7,16 @@ class Settings(ctx: Context) {
     val p: SharedPreferences = ctx.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     /** Запис у списку "Мої графіки": група + своя назва ("дім") + пуші для неї. */
-    data class Entry(val key: String, val id: String, val label: String, val notify: Boolean)
+    data class Entry(
+        val key: String, val id: String, val label: String, val notify: Boolean,
+        /** адреса з бази ДТЕК (для точної групи і статусу екстрених відключень) */
+        val city: String? = null, val street: String? = null, val house: String? = null,
+        /** група визначена приблизно (за GPS, найближча адреса ДТЕК) */
+        val approx: Boolean = false,
+    ) {
+        val hasAddress: Boolean get() = city != null && street != null && house != null
+        val address: String get() = listOfNotNull(city, street?.let { if (house != null) "$it, $house" else it }).joinToString(", ")
+    }
 
     var entries: List<Entry>
         get() {
@@ -21,13 +30,18 @@ class Settings(ctx: Context) {
                 val a = org.json.JSONArray(raw)
                 (0 until a.length()).map { i ->
                     val o = a.getJSONObject(i)
-                    Entry(o.getString("key"), o.getString("id"), o.optString("label"), o.optBoolean("notify", true))
+                    fun opt(k: String) = o.optString(k).takeIf { it.isNotBlank() && it != "null" }
+                    Entry(o.getString("key"), o.getString("id"), o.optString("label"), o.optBoolean("notify", true),
+                        opt("city"), opt("street"), opt("house"), o.optBoolean("approx", false))
                 }
             } catch (_: Exception) { emptyList() }
         }
         set(v) {
             val a = org.json.JSONArray()
-            v.forEach { a.put(org.json.JSONObject().put("key", it.key).put("id", it.id).put("label", it.label).put("notify", it.notify)) }
+            v.forEach {
+                a.put(org.json.JSONObject().put("key", it.key).put("id", it.id).put("label", it.label).put("notify", it.notify)
+                    .put("city", it.city ?: "").put("street", it.street ?: "").put("house", it.house ?: "").put("approx", it.approx))
+            }
             p.edit().putString("entries", a.toString()).apply()
         }
 

@@ -40,6 +40,10 @@ object Sync {
     suspend fun run(c: Context, direct: Boolean): Repository.FetchResult = mutex.withLock {
         val m = Repository.fetchMirror(c)
         val d = if (direct) Repository.fetchDirect(c) else null
+        // статуси адрес (екстрені відключення саме у твоєму будинку)
+        if (direct || Settings(c).entries.any { it.hasAddress }) {
+            try { kotlinx.coroutines.withTimeoutOrNull(60_000) { com.savchenko.smsvitlo.data.Address.refreshAll(c) } } catch (_: Exception) {}
+        }
         Repository.invalidate()
         val s = Repository.current(c)
         Notifier.processChanges(c, s)
@@ -122,7 +126,9 @@ class LiveService : Service() {
                 val status = Timeline.status(s, g) ?: return@mapNotNull null
                 val ch = Timeline.changeText(status)
                 val inT = status.changeAt?.let { " (" + Timeline.inShort(Duration.between(Timeline.now(), it)) + ")" } ?: ""
-                "${st.displayName(g, s)}: ${Timeline.stateText(status.current)}" + (ch?.let { " · $it$inT" } ?: "")
+                val h = com.savchenko.smsvitlo.data.Address.activeForGroup(c, g)
+                if (h != null) "${st.displayName(g, s)}: ${h.shortType}" + (h.untilText?.let { " · $it" } ?: "")
+                else "${st.displayName(g, s)}: ${Timeline.stateText(status.current)}" + (ch?.let { " · $it$inT" } ?: "")
             }
             val title = lines.firstOrNull() ?: "SM Світло: моніторинг"
             val upd = if (s.fetchedAtMillis > 0) "перевірено " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(s.fetchedAtMillis) else ""

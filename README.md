@@ -14,6 +14,9 @@ An Android app with DTEK Dnipro power outage schedules. Shows when the power goe
 ## Features
 
 - Several schedules at once, each with its own name and group (home, dacha, school), including the ЦЕК groups
+- Find your group by address from the DTEK database (city, street, house)
+- Live outage status at your address (emergency, accident, planned) with restore time and push notifications
+- Approximate group by GPS for places missing from the DTEK database (garden cooperatives, new streets): nearest DTEK address via OpenStreetMap
 - Current status ("power on until 16:30") and time until the next change
 - Hour grid for today and tomorrow (when DTEK publishes it), with "on", "off" and "possible" states
 - Warning banner when emergency outages are in effect
@@ -30,14 +33,18 @@ An Android app with DTEK Dnipro power outage schedules. Shows when the power goe
 
 ## Data source
 
-Schedules come from the open [outage-data-ua](https://github.com/Baskerville42/outage-data-ua) dataset (`data/dnipro.json`). There is also an experimental option to read the DTEK website directly through a WebView.
+Schedules come from the open [outage-data-ua](https://github.com/Baskerville42/outage-data-ua) dataset (`data/dnipro.json`). Address lookup, address outage status and the direct schedule source use the DTEK website (dtek-dnem.com.ua) in a hidden WebView. GPS lookup uses the OpenStreetMap [Overpass API](https://overpass-api.de).
 
 ## Tech
 
 - Kotlin, Jetpack Compose, Material 3
 - WorkManager for background sync, AlarmManager for exact reminders, a foreground service for real-time mode
-- minSdk 26, targetSdk 35, version 1.2.1
+- minSdk 26, targetSdk 35, version 1.3.0
 - Unit tests for the schedule logic and screenshot tests with Paparazzi (`app/src/test`)
+
+## Changes
+
+See [CHANGELOG.md](CHANGELOG.md) (Ukrainian).
 
 ## Build
 

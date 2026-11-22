@@ -74,6 +74,17 @@ fun StatusChip(s: Snapshot, id: String) {
     Chip(Timeline.stateText(st.current) + change, icon, bg, fg, tint)
 }
 
+/** Статус за графіком + (якщо є адреса) реальне відключення за адресою з ДТЕК. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun StatusRow(s: Snapshot, e: Settings.Entry) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val h = if (e.hasAddress) com.savchenko.smsvitlo.data.Address.status(ctx, e.key) else null
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (h?.active == true) HouseChip(h) else StatusChip(s, e.id)
+    }
+}
+
 private data class Quad(val a: Color, val b: Color, val c: ImageVector, val d: Color)
 
 @Composable
@@ -158,9 +169,7 @@ fun EntryCard(s: Snapshot, e: Settings.Entry, timeline: Boolean, onOpen: () -> U
     ) {
         Column(Modifier.padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 14.dp)) {
             CardHeader(s, e, onEdit, onDelete)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusChip(s, e.id)
-            }
+            StatusRow(s, e)
             val st = Timeline.status(s, e.id)
             if (st?.changeAt != null) {
                 val left = Timeline.inText(Duration.between(Timeline.now(), st.changeAt))
@@ -190,6 +199,11 @@ fun CardHeader(s: Snapshot, e: Settings.Entry, onEdit: () -> Unit, onDelete: () 
                 Text("ДТЕК  •  ${s.groupName(e.id)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
             Text(e.label.ifBlank { s.groupName(e.id) }, color = MaterialTheme.colorScheme.primary,
                 fontSize = 20.sp, fontWeight = FontWeight.Medium)
+            if (e.hasAddress) Text(
+                (if (e.approx) "≈ приблизно, за " else "") + e.address,
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
         }
         IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, "Змінити", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, "Видалити", tint = RED) }
@@ -231,7 +245,7 @@ fun DetailScreen(
         ) {
             Column(Modifier.padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 14.dp)) {
                 CardHeader(s, e, onEdit, onDelete)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { StatusChip(s, e.id) }
+                StatusRow(s, e)
                 Column(Modifier.padding(end = 10.dp)) {
                     Spacer(Modifier.height(14.dp))
                     DaySwitch(tomorrow) { tomorrow = it; picked = null }
@@ -411,45 +425,8 @@ private fun Summary(h: List<Half>, exact: Boolean) {
     Text(t, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-// ---------- додавання / редагування ----------
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun EntrySheet(s: Snapshot, initial: Settings.Entry?, onDismiss: () -> Unit, onSave: (id: String, label: String) -> Unit) {
-    var id by remember { mutableStateOf(initial?.id ?: "GPV1.1") }
-    var label by remember { mutableStateOf(initial?.label ?: "") }
-    var showCek by remember { mutableStateOf(initial?.id?.let { Parser.sortKey(it).first == 1 } ?: false) }
-    val all = s.allGroups.ifEmpty { (1..6).flatMap { listOf("GPV$it.1", "GPV$it.2") } }
-    val main = all.filter { Parser.sortKey(it).first == 0 }
-    val cek = all.filter { Parser.sortKey(it).first == 1 }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).navigationBarsPadding()) {
-            Text(if (initial == null) "Новий графік" else "Редагувати", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(14.dp))
-            OutlinedTextField(label, { label = it.take(30) }, Modifier.fillMaxWidth(),
-                label = { Text("Назва (напр. дім, дача, школа)") }, singleLine = true, shape = RoundedCornerShape(16.dp))
-            Spacer(Modifier.height(16.dp))
-            Text("Черга ДТЕК", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                main.forEach { g -> GroupPill(Parser.shortName(g), g == id) { id = g } }
-            }
-            if (cek.isNotEmpty()) {
-                TextButton(onClick = { showCek = !showCek }) { Text(if (showCek) "Сховати ЦЕК" else "Групи ЦЕК…") }
-                if (showCek) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    cek.forEach { g -> GroupPill(Parser.shortName(g), g == id) { id = g } }
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-            Button(onClick = { onSave(id, label.trim()) }, Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(27.dp)) {
-                Text("Зберегти", fontSize = 17.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun GroupPill(t: String, sel: Boolean, on: () -> Unit) {
+fun GroupPill(t: String, sel: Boolean, on: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     val bg by animateColorAsState(if (sel) cs.primary else cs.surfaceContainer, label = "pill")
     Box(

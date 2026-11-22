@@ -36,6 +36,18 @@ class ShotTest {
         }
     }
     @Test fun homeLight() = shot(1, 0, false)
+    @Test fun lookupCard() {
+        val look = Look(Settings(paparazzi.context)).apply { theme = 2 }
+        val h = com.savchenko.smsvitlo.data.House("1", listOf("GPV1.1"), "Екстрені відключення", "14:02 22.11.2026", "19:30 22.11.2026", "2")
+        paparazzi.snapshot {
+            AppTheme(look) {
+                androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(16.dp)) {
+                    LookupCard(com.savchenko.smsvitlo.data.Lookup("с. Волоське", "вул. Центральна", "1", "GPV1.1", h, true, 1.8, listOf("GPV2.1")))
+                    LookupCard(com.savchenko.smsvitlo.data.Lookup("м. Дніпро", "просп. Дмитра Яворницького", "50", "GPV3.2", null, false))
+                }
+            }
+        }
+    }
     @Test fun homeDark() = shot(2, 0, false)
     @Test fun detailLight() = shot(1, 0, true)
     @Test fun detailDarkColor() = shot(2, 1, true)

@@ -40,4 +40,27 @@ class LogicTest {
         println(Timeline.intervals(tm.halves).map { it.label() + it.state })
         assertEquals("Черга 1.1", Parser.prettyName("GPV1.1")); assertEquals("ЦЕК 2.1", Parser.prettyName("GPV1002.1"))
     }
+
+    @Test fun addressMatching() {
+        val a = com.savchenko.smsvitlo.data.Address
+        assertEquals(a.core("вул. Центральна"), a.core("вулиця Центральна"))
+        assertEquals(a.core("вул. Центральна"), a.core("Центральна вулиця"))
+        assertEquals(a.core("с. Волоське"), a.core("Волоське"))
+        assertEquals(a.core("м. Дніпро"), a.core("Дніпро"))
+        assertEquals(a.core("пров. Шевченка"), a.core("провулок Шевченка"))
+        assertEquals(listOf("с. Волоське", "с. Волосківці"), a.filter(listOf("м. Дніпро", "с. Волоське", "с. Волосківці"), "волос"))
+    }
+
+    @Test fun houseParsing() {
+        val o = org.json.JSONObject("""{"sub_type":"Екстрені відключення (Аварійне без застосування графіку погодинних відключень)",
+            "start_date":"14:02 22.11.2026","end_date":"19:30 22.11.2026","type":"2","sub_type_reason":["GPV1.1"],"voluntarily":null}""")
+        val h = com.savchenko.smsvitlo.data.House.fromDtek("1", o)
+        assertEquals(listOf("GPV1.1"), h.groups)
+        assertTrue(h.active)
+        assertEquals("Екстрене відключення", h.shortType)
+        val back = com.savchenko.smsvitlo.data.House.fromJson(h.toJson())
+        assertEquals(h, back)
+        val none = com.savchenko.smsvitlo.data.House.fromDtek("2", org.json.JSONObject("""{"sub_type":"","start_date":"","end_date":"","type":"","sub_type_reason":["GPV2.1"]}"""))
+        assertFalse(none.active)
+    }
 }

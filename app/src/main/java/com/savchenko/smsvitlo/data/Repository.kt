@@ -1,31 +1,22 @@
 package com.savchenko.smsvitlo.data
 
-import android.annotation.SuppressLint
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
-import org.json.JSONTokener
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
-import kotlin.coroutines.resume
 
 object Repository {
     private const val API =
         "https://api.github.com/repos/Baskerville42/outage-data-ua/contents/data/dnipro.json?ref=main"
     private const val RAW =
         "https://raw.githubusercontent.com/Baskerville42/outage-data-ua/main/data/dnipro.json"
-    const val DTEK_URL = "https://www.dtek-dnem.com.ua/ua/shutdowns"
 
     @Volatile private var cached: Snapshot? = null
 
@@ -85,58 +76,19 @@ object Repository {
         }
     }
 
-    /** Пряме джерело: сторінка ДТЕК у прихованому WebView, читаємо DisconSchedule.fact/preset. */
-    suspend fun fetchDirect(c: Context, timeoutMs: Long = 40000): FetchResult {
-        val json = withTimeoutOrNull(timeoutMs) { loadDtekPage(c.applicationContext) }
-            ?: return FetchResult(false, false, "ДТЕК напряму недоступний")
-        return withContext(Dispatchers.IO) {
-            val changed = json != directFile(c).takeIf { it.exists() }?.readText()
-            directFile(c).writeText(json)
-            prefs(c).edit().putLong("directAt", System.currentTimeMillis()).apply()
-            cached = null
-            FetchResult(true, changed, "ДТЕК напряму")
-        }
+    /** Пряме джерело: сирий HTML сторінки ДТЕК через сесію у WebView. */
+    suspend fun fetchDirect(c: Context): FetchResult {
+        val boot = withTimeoutOrNull(45_000) { DtekWeb.bootstrap(c.applicationContext, withStreets = false) }
+        val json = boot?.scheduleJson ?: return FetchResult(false, false, "ДТЕК напряму недоступний")
+        return saveDirect(c, json)
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
-    private suspend fun loadDtekPage(ctx: Context): String? = suspendCancellableCoroutine { cont ->
-        val main = Handler(Looper.getMainLooper())
-        main.post {
-            val wv = try { WebView(ctx) } catch (e: Exception) { cont.resume(null); return@post }
-            var finished = false
-            var polling = false
-            fun finish(r: String?) {
-                if (finished) return
-                finished = true
-                main.post { try { wv.stopLoading(); wv.destroy() } catch (_: Exception) {} }
-                if (cont.isActive) cont.resume(r)
-            }
-            val js = """(function(){try{
-                var d=(typeof DisconSchedule!=='undefined')?DisconSchedule:null;
-                if(d&&d.fact&&d.fact.data){return JSON.stringify({fact:d.fact,preset:d.preset||null});}
-              }catch(e){}return null;})()"""
-            val poll = object : Runnable {
-                override fun run() {
-                    if (finished) return
-                    wv.evaluateJavascript(js) { r ->
-                        if (r != null && r != "null") {
-                            val s = try { JSONTokener(r).nextValue() as? String } catch (_: Exception) { null }
-                            if (s != null) { finish(s); return@evaluateJavascript }
-                        }
-                        main.postDelayed(this, 1500)
-                    }
-                }
-            }
-            wv.settings.javaScriptEnabled = true
-            wv.settings.domStorageEnabled = true
-            wv.webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    if (!polling) { polling = true; main.postDelayed(poll, 500) }
-                }
-            }
-            cont.invokeOnCancellation { main.post { finished = true; try { wv.destroy() } catch (_: Exception) {} } }
-            wv.loadUrl(DTEK_URL)
-        }
+    suspend fun saveDirect(c: Context, json: String): FetchResult = withContext(Dispatchers.IO) {
+        val changed = json != directFile(c).takeIf { it.exists() }?.readText()
+        directFile(c).writeText(json)
+        prefs(c).edit().putLong("directAt", System.currentTimeMillis()).apply()
+        cached = null
+        FetchResult(true, changed, "ДТЕК напряму")
     }
 
     private val DTEK_FMT = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).apply {
